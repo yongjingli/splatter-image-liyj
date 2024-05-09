@@ -73,7 +73,7 @@ wget https://tri-ml-public.s3.amazonaws.com/datasets/views_release.tar.gz
 ```
 Disclaimer: note that the renderings are generated with Objaverse. The renderings as a whole are released under the ODC-By 1.0 license. The licenses for the renderings of individual objects are released under the same license creative commons that they are in Objaverse.
 
-Additionally, please download `lvis-annotations-filtered.json` from the [model repository](). 
+Additionally, please download `lvis-annotations-filtered.json` from the [model repository](https://huggingface.co/szymanowiczs/splatter-image-v1/blob/main/lvis-annotations-filtered.json). 
 This json which holds the list of IDs of objects from the LVIS subset. These assets are of higher quality.
 
 Set `OBJAVERSE_ROOT` in `datasets/objaverse.py` to the directory of the unzipped folder with renderings, and set `OBJAVERSE_LVIS_ANNOTATION_PATH` in the same file to the directory of the downloaded `.json` file.
