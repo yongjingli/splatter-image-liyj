@@ -82,7 +82,7 @@ Note that Objaverse dataset is meant for training and validation only. It does n
 
 ## Google Scanned Objects
 
-For evaluating the model trained on Objaverse we use Google Scanned Objects dataset to ensure no overlap with the training set. Download [renderings provided by Free3D](`https://drive.google.com/file/d/1tV-qpiD5e-GzrjW5dQpTRviZa4YV326b/view`). Unzip the downloaded folder and set `GSO_ROOT` in `datasets/gso.py` to the directory of the unzipped folder.
+For evaluating the model trained on Objaverse we use Google Scanned Objects dataset to ensure no overlap with the training set. Download [renderings provided by Free3D](https://drive.google.com/file/d/1tV-qpiD5e-GzrjW5dQpTRviZa4YV326b/view). Unzip the downloaded folder and set `GSO_ROOT` in `datasets/gso.py` to the directory of the unzipped folder.
 
 Note that Google Scanned Objects dataset is not meant for training. It is used to test the model trained on Objaverse.
 
