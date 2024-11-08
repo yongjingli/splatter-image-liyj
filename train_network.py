@@ -129,6 +129,7 @@ def main(cfg: DictConfig):
     dataset = get_dataset(cfg, "train")
     dataloader = DataLoader(dataset, 
                             batch_size=cfg.opt.batch_size,
+                            # batch_size=2,
                             shuffle=True,
                             num_workers=num_workers,
                             persistent_workers=persistent_workers)

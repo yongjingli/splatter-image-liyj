@@ -1,3 +1,5 @@
+import copy
+
 import torch
 import torch.nn as nn
 import torchvision 
@@ -755,11 +757,29 @@ class GaussianSplatPredictor(nn.Module):
         pos = torch.cat([pos, 
                          torch.ones((pos.shape[0], pos.shape[1], 1), device=pos.device, dtype=torch.float32)
                          ], dim=2)
-        pos = torch.bmm(pos, source_cameras_view_to_world)
+
+        # pos_cam = copy.deepcopy(pos)
+
+        # 从输出的source_cameras_view_to_world来看, 每次进来的都是单位矩阵，所以source_cameras_view_to_world.t 等于source_cameras_view_to_world
+        # 所以在这里是右乘得到的结果与逆所得到的结果是一样的，掩盖了这里的错误
+        # print(torch.allclose(source_cameras_view_to_world[:, :3, :3], torch.eye(3).unsqueeze(0).cuda(), atol=1e-06))
+
+        # 在训练的时候
+        #  frame_idxs = torch.randperm(len(self.all_rgbs[example_id]))[:self.imgs_per_obj]
+        # 每次都是随机从相同对象的文件夹中选取idx, 然后再计算相对位姿, 那么每次都是与第一个计算相对位姿, 都是单位矩阵
+        # 在训练的时候也是选择一个图片作为输入, 掩盖了在进行相对位姿计算时bmm的错误
+
+        pos = torch.bmm(pos, source_cameras_view_to_world)    # 这里是相机到世界坐标的的转换,应该是乘以source_cameras_view_to_world.T才对？？ 需要进一步确认
         pos = pos[:, :, :3] / (pos[:, :, 3:] + 1e-10)
-        
+
+        # pos_inv = torch.bmm(torch.cat([pos, torch.ones((pos.shape[0], pos.shape[1], 1), device=pos.device, dtype=torch.float32)], dim=2),
+        #                     torch.linalg.inv(source_cameras_view_to_world))
+
+        # pos_inv = torch.transpose(torch.linalg.inv(source_cameras_view_to_world)[0] @ torch.transpose(torch.cat([pos, torch.ones((pos.shape[0], pos.shape[1], 1), device=pos.device, dtype=torch.float32)], dim=2)[0], 1, 0), 1, 0)
+
         out_dict = {
-            "xyz": pos, 
+            # "xyz_cam": pos_cam,
+            "xyz": pos,
             "rotation": self.flatten_vector(self.rotation_activation(rotation)),
             "features_dc": self.flatten_vector(features_dc).unsqueeze(2)
                 }
@@ -779,7 +799,7 @@ class GaussianSplatPredictor(nn.Module):
         if self.cfg.model.max_sh_degree > 0:
             features_rest = self.flatten_vector(features_rest)
             # Channel dimension holds SH_num * RGB(3) -> renderer expects split across RGB
-            # Split channel dimension B x N x C -> B x N x SH_num x 3
+            # Split channel dimension B x N x C -> B x N x SH_num x 3  SH_num代表rgb中每个通道采用球谐函数的阶数(基函数的个数) 预测这些基函数的系数即可
             out_dict["features_rest"] = features_rest.reshape(*features_rest.shape[:2], -1, 3)
             assert self.cfg.model.max_sh_degree == 1 # "Only accepting degree 1"
             out_dict["features_rest"] = self.transform_SHs(out_dict["features_rest"],

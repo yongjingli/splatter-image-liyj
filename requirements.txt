@@ -1,4 +1,16 @@
-ema-pytorch
+# 安装pytorch3d
+#设置cub-home
+#export CUB_HOME=/usr/local/cuda-*/include/
+##/usr/local/cuda-11.6/include
+#设置cuda-home
+#export CUDA_HOME=/usr/local/cuda-11.6
+#pip install --no-index --no-cache-dir pytorch3d -f https://anaconda.org/pytorch3d/pytorch3d/0.7.2/download/linux-64/pytorch3d-0.7.2-py38_cu116_pyt1130.tar.bz2
+
+
+#ema-pytorch
+ema-pytorch==0.5.0   # ema-pytorch 0.5.0  當版本大於0.6.0的時候就需要torch 2.0以上
+#  sudo git clone https://github.com/lucidrains/ema-pytorch
+# python setup.py install 来看安装,安装过程好像会安装高版本的torch，但好像没有真正卸载已有的torch来安装
 tqdm
 hydra-core
 omegaconf
@@ -9,7 +21,9 @@ einops
 imageio
 wandb
 moviepy
-lightning==2.0
+#lightning==2.0
+pytorch-lightning==2.0   # 需要修改爲安裝pytorch-lightning
 markupsafe==2.0.1
-gradio
+#gradio
+gradio     # 修改版本 3.28.0 同时修改相关库的版本 pydantic==1.10.15 fastapi==0.88.0
 huggingface_hub

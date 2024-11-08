@@ -30,18 +30,23 @@ from huggingface_hub import hf_hub_download
 @torch.no_grad()
 def main():
 
-    os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+    # os.environ["CUDA_VISIBLE_DEVICES"] = "1"
     device = torch.device("cuda:0")
     torch.cuda.set_device(device)
 
-    model_cfg = OmegaConf.load(
-        os.path.join(
-            os.path.dirname(os.path.abspath(__file__)), 
-                    "gradio_config.yaml"
-                    ))
 
-    model_path = hf_hub_download(repo_id="szymanowiczs/splatter-image-multi-category-v1", 
-                                filename="model_latest.pth")
+
+    # set local_dir？
+    # model_path = hf_hub_download(repo_id="szymanowiczs/splatter-image-multi-category-v1",
+    #                             filename="model_latest.pth")
+    # 直接指定模型的权重位置
+    model_cfg = os.path.join(os.path.dirname(os.path.abspath(__file__)), "gradio_config.yaml")
+    model_path = "/home/pxn-lyj/Egolee/programs/splatter-image-liyj/checkpoints/gradio_config/model_latest.pth"
+
+    # model_cfg = "/home/pxn-lyj/Egolee/programs/splatter-image-liyj/checkpoints/shapenet/config_cars.yaml"
+    # model_path = "/home/pxn-lyj/Egolee/programs/splatter-image-liyj/checkpoints/shapenet/model_cars.pth"
+
+    model_cfg = OmegaConf.load(model_cfg)
 
     model = GaussianSplatPredictor(model_cfg)
 
@@ -225,6 +230,7 @@ def main():
 
     demo.queue(max_size=1)
     demo.launch()
+
 
 if __name__ == "__main__":
     main()

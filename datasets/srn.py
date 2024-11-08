@@ -11,7 +11,8 @@ from utils.graphics_utils import getWorld2View2, getProjectionMatrix, getView2Wo
 
 from .shared_dataset import SharedDataset
 
-SHAPENET_DATASET_ROOT = None # Change this to your data directory
+# SHAPENET_DATASET_ROOT = None # Change this to your data directory
+SHAPENET_DATASET_ROOT = "/home/pxn-lyj/Egolee/data/shapenet_srn_data"
 assert SHAPENET_DATASET_ROOT is not None, "Update the location of the SRN Shapenet Dataset"
 
 class SRNDataset(SharedDataset):
@@ -82,7 +83,7 @@ class SRNDataset(SharedDataset):
             self.all_full_proj_transforms[example_id] = []
             self.all_camera_centers[example_id] = []
             self.all_view_to_world_transforms[example_id] = []
-
+            # cam_infos中的R=R, T=T为W2c, 是世界坐标到相机坐标的转换矩阵
             cam_infos = readCamerasFromTxt(rgb_paths, pose_paths, [i for i in range(len(rgb_paths))])
 
             for cam_info in cam_infos:
