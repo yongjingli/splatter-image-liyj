@@ -97,8 +97,14 @@ def get_target_cameras(num_imgs_in_loop=200):
 
     projection_matrix = getProjectionMatrix(
         znear=0.8, zfar=3.2,
-        fovX=49.134342641202636 * 2 * np.pi / 360, 
+        fovX=49.134342641202636 * 2 * np.pi / 360,
         fovY=49.134342641202636 * 2 * np.pi / 360).transpose(0,1)
+
+    # shapenet的训练参数，得到的效果似乎没有区别
+    # projection_matrix = getProjectionMatrix(
+    #     znear=0.8, zfar=1.8,
+    #     fovX=51.98948897809546 * 2 * np.pi / 360,
+    #     fovY=51.98948897809546 * 2 * np.pi / 360).transpose(0,1)
 
     target_cameras = get_loop_cameras(num_imgs_in_loop=num_imgs_in_loop,
                                       max_elevation=np.pi/4,

@@ -24,6 +24,12 @@ from datasets.dataset_factory import get_dataset
 
 @hydra.main(version_base=None, config_path='configs', config_name="default_config")
 def main(cfg: DictConfig):
+    # save cfg
+    cfg_yaml_str = OmegaConf.to_yaml(cfg)
+    save_cfg_name = "cfg_train.yaml"
+    print("save cfg:", os.path.realpath(save_cfg_name))
+    with open(save_cfg_name, 'w') as f:
+        f.write(cfg_yaml_str)
 
     torch.set_float32_matmul_precision('high')
     if cfg.general.mixed_precision:
@@ -83,6 +89,11 @@ def main(cfg: DictConfig):
             first_iter = checkpoint["iteration"]
             best_PSNR = checkpoint["best_PSNR"] 
             print('Loaded model')
+
+            # add-2024-11-21-liyj
+            # optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
+            # print('Loaded optimizer')
+
         # Resuming from checkpoint
         elif cfg.opt.pretrained_ckpt is not None:
             pretrained_ckpt_dir = os.path.join(cfg.opt.pretrained_ckpt, "model_latest.pth")
@@ -213,6 +224,7 @@ def main(cfg: DictConfig):
                 # does not support batching
                 gaussian_splat_batch = {k: v[b_idx].contiguous() for k, v in gaussian_splats.items()}
                 for r_idx in range(cfg.data.input_images, data["gt_images"].shape[1]):
+                # for r_idx in range(1, data["gt_images"].shape[1]):   # 多视图输入时，将第二视图也作为训练
                     if "focals_pixels" in data.keys():
                         focals_pixels_render = data["focals_pixels"][b_idx, r_idx].cpu()
                     else:

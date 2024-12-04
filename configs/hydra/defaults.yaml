@@ -6,3 +6,36 @@ sweep:
   subdir: ${hydra.job.override_dirname}
 job:
   chdir: True
+
+# resume
+#run:
+#  dir: experiments_out/cars_1_img_stage1_2024_11_13/16-48-13
+#sweep:
+#  dir: experiments_out/cars_1_img_stage1_2024_11_13/16-48-13
+#  subdir: ${hydra.job.override_dirname}
+#job:
+#  chdir: True
+
+#run:
+#  dir: experiments_out/2024-11-19/09-49-52   # 27
+#sweep:
+#  dir: experiments_out/2024-11-19/09-49-52
+#  subdir: ${hydra.job.override_dirname}
+#job:
+#  chdir: True
+
+#run:
+#  dir: experiments_out/2024-11-20/15-09-10   # 35
+#sweep:
+#  dir: experiments_out/2024-11-20/15-09-10
+#  subdir: ${hydra.job.override_dirname}
+#job:
+#  chdir: True
+
+#run:
+#  dir: experiments_out/2024-11-22/14-44-26   # 37
+#sweep:
+#  dir: experiments_out/2024-11-22/14-44-26
+#  subdir: ${hydra.job.override_dirname}
+#job:
+#  chdir: True

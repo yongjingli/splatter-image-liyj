@@ -22,7 +22,7 @@ from restore_mesh_2_raw_cam_pnp import get_crop_and_expand_rect_by_mask, \
     pad_and_resize_img, resize_to_128_with_K, get_depth_points,\
     project_points_to_image_opencv, get_xyz_by_uvz, filter_uvz_by_distance,\
     get_xyz_by_uvz, get_match_uv_between_gt_and_pred, calculate_scale_and_rt, \
-    save_2_ply
+    save_2_ply, get_depth_by_xyz, align_two_depths
 
 from scene.gaussian_predictor import GaussianSplatPredictor
 from gaussian_renderer import render_predicted
@@ -30,6 +30,10 @@ import rembg
 from omegaconf import OmegaConf
 from utils.app_utils import get_source_camera_v2w_rmo_and_quats, to_tensor, export_to_obj
 from detic_infer import Detic
+
+sys.path.insert(0, "/home/pxn-lyj/Egolee/programs/MoGe_liyj")
+from moge.model import MoGeModel
+
 
 # sys.path.insert(0, "/home/pxn-lyj/Egolee/programs/FastSAM_liyj")
 # from fastsam import FastSAM, FastSAMPrompt
@@ -370,13 +374,16 @@ def infer_complete_objs_in_scence_online():
     colors = generate_colors(20)
 
     count = 1
+    device = torch.device("cuda:0")
+    depth_model = MoGeModel.from_pretrained("Ruicheng/moge-vitl").to(device)
+
     # fast_sam_model = FastSAM('/home/pxn-lyj/Egolee/programs/FastSAM_liyj/local_files/weights/FastSAM-x.pt')
     detic_model = Detic("/home/pxn-lyj/Egolee/programs/splatter-image-liyj/local_files/Detic_C2_R50_640_4x_in21k.onnx", confThreshold=0.4)
 
     # model
     model_cfg = "/home/pxn-lyj/Egolee/programs/splatter-image-liyj/gradio_config.yaml"
     model_path = "/home/pxn-lyj/Egolee/programs/splatter-image-liyj/checkpoints/gradio_config/model_latest.pth"
-    device = torch.device("cuda:0")
+
     torch.cuda.set_device(device)
     model_cfg = OmegaConf.load(model_cfg)
     model = GaussianSplatPredictor(model_cfg)
@@ -417,11 +424,36 @@ def infer_complete_objs_in_scence_online():
             depth[depth >= 2.0] = 0
 
             color_image = color_image[:, :, ::-1]
+
+            # color_image = cv2.imread("/home/pxn-lyj/Egolee/data/test/mesh_jz/colors/00445_color.jpg")
+            # depth = np.load("/home/pxn-lyj/Egolee/data/test/mesh_jz/depths_realsense/00445_depth.npy")
+
+            # depth infer
+            input_image = cv2.cvtColor(color_image, cv2.COLOR_BGR2RGB)
+            input_image = torch.tensor(input_image / 255, dtype=torch.float32, device=device).permute(2, 0, 1)
+            depth_output = depth_model.infer(input_image)
+            pred_depth = depth_output['depth'].cpu().detach().numpy()
+
+            # 将pred_detph对齐到depth
+            align_depth = align_two_depths(color_image, depth, pred_depth, cam_K_color, min_depth=0.1, max_depth=5.0)
+
+            # plt.subplot(2, 1, 1)
+            # plt.imshow(pred_depth)
+            #
+            # plt.subplot(2, 1, 2)
+            # plt.imshow(align_depth)
+            #
+            # plt.show()
+
             rs_pts, rs_pts_colors = image_and_depth_to_point_cloud(color_image, depth, fx=cam_K_color[0, 0], fy=cam_K_color[1, 1],
                                                               cx=cam_K_color[0, 2], cy=cam_K_color[1, 2], max_depth=2.0)
 
-            # color_image = cv2.imread("/home/pxn-lyj/Egolee/programs/splatter-image-liyj/local_files/tmp1/61_color.jpg")
-            # depth = np.load("/home/pxn-lyj/Egolee/programs/splatter-image-liyj/local_files/tmp1/61_depth.npy")
+
+            moge_pts, moge_pts_colors = image_and_depth_to_point_cloud(color_image, align_depth, fx=cam_K_color[0, 0], fy=cam_K_color[1, 1],
+                                                              cx=cam_K_color[0, 2], cy=cam_K_color[1, 2], max_depth=2.0)
+
+            # depth = align_depth
+
             image_show = copy.deepcopy(color_image)
 
             preds = detic_model.detect(color_image)
@@ -533,6 +565,10 @@ def infer_complete_objs_in_scence_online():
                     s_ply_path = os.path.join(s_root, str(count) + "_rs.ply")
                     save_2_ply(s_ply_path, rs_pts[:, 0], rs_pts[:, 1], rs_pts[:, 2],
                                rs_pts_colors.tolist())
+
+                    s_ply_path = os.path.join(s_root, str(count) + "_moge.ply")
+                    save_2_ply(s_ply_path, moge_pts[:, 0], moge_pts[:, 1], moge_pts[:, 2],
+                               moge_pts_colors.tolist())
 
                     s_npy_path = os.path.join(s_sematic_pt_root, str(count) + "_pt_sematic.npy")
                     np.save(s_npy_path, np.concatenate([all_complete_ojbs, all_complete_ojbs_color, all_complete_ojbs_sematic], axis=1))

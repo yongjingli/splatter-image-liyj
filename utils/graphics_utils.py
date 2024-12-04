@@ -62,6 +62,8 @@ def getView2World(R, t, translate=np.array([.0, .0, .0]), scale=1.0):
     return np.float32(Rt)
 
 def getProjectionMatrix(znear, zfar, fovX, fovY):
+    # 这个矩阵将三维坐标转换为二维坐标
+    # https://github.com/szymanowiczs/splatter-image/issues/17
     tanHalfFovY = math.tan((fovY / 2))
     tanHalfFovX = math.tan((fovX / 2))
 

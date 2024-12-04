@@ -346,6 +346,83 @@ def get_mesh_from_pts(pts):
     return mesh
 
 
+def get_depth_by_xyz(img, pcs, cam_k):
+    _, pred_uvz = project_points_to_image_opencv(img, pcs, cam_k)
+    filter_pred_uvz = filter_uvz_by_distance(pred_uvz, scale=1.0)
+    u = filter_pred_uvz[:, 0].astype(np.int32)
+    v = filter_pred_uvz[:, 1].astype(np.int32)
+    z = filter_pred_uvz[:, 2]
+
+    depth = np.zeros((img.shape[0], img.shape[1]), dtype=np.float32)
+    depth[v, u] = z
+    return depth
+
+def image_and_depth_to_point_cloud(image, depth, fx, fy, cx, cy, max_depth=5.0):
+    rows, cols = depth.shape
+    u, v = np.meshgrid(range(cols), range(rows))
+    z = depth
+    # 将深度为 0 或小于等于某个极小值的点标记为无效
+    invalid_mask = np.bitwise_or(np.bitwise_or(z <= 0, z < np.finfo(np.float32).eps), z > max_depth)
+    x = np.where(~invalid_mask, (u - cx) * z / fx, 0)
+    y = np.where(~invalid_mask, (v - cy) * z / fy, 0)
+    # z = z[~invalid_mask]
+    points = np.stack([x, y, z], axis=-1).reshape(-1, 3)
+    colors = image.reshape(-1, 3)
+
+    points = points[~invalid_mask.reshape(-1)]
+    colors = colors[~invalid_mask.reshape(-1)]
+
+    return points, colors
+
+
+
+def image_and_depth_to_point_clouds(image, depth0, depth1, fx, fy, cx, cy, max_depth=5.0):
+    rows, cols = depth0.shape
+    u, v = np.meshgrid(range(cols), range(rows))
+    z0 = depth0
+    z1 = depth1
+
+    invalid_mask0 = np.bitwise_or(np.bitwise_or(z0 <= 0, z0 < np.finfo(np.float32).eps), z0 > max_depth)
+    invalid_mask1 = np.bitwise_or(np.bitwise_or(z1 <= 0, z1 < np.finfo(np.float32).eps), z1 > max_depth)
+    invalid_mask = np.bitwise_or(invalid_mask0, invalid_mask1)
+
+    x0 = np.where(~invalid_mask, (u - cx) * z0 / fx, 0)
+    y0 = np.where(~invalid_mask, (v - cy) * z0 / fy, 0)
+    x1 = np.where(~invalid_mask, (u - cx) * z1 / fx, 0)
+    y1 = np.where(~invalid_mask, (v - cy) * z1 / fy, 0)
+
+    points0 = np.stack([x0, y0, z0], axis=-1).reshape(-1, 3)
+    points0 = points0[~invalid_mask.reshape(-1)]
+
+    points1 = np.stack([x1, y1, z1], axis=-1).reshape(-1, 3)
+    points1 = points1[~invalid_mask.reshape(-1)]
+
+    colors = image.reshape(-1, 3)
+    colors = colors[~invalid_mask.reshape(-1)]
+
+    return points0, points1, colors
+
+
+def align_two_depths(img, depth_0, depth_1, cam_k, min_depth=0.1, max_depth=5.0):
+    valid_mask0 = np.bitwise_and(depth_0 > min_depth, depth_0 < max_depth)
+    # valid_mask1 = np.bitwise_and(depth_1 > min_depth, depth_1 < max_depth)
+    # valid_mask = np.bitwise_and(valid_mask0, valid_mask1)
+    valid_mask = valid_mask0
+    depth_0[~valid_mask] = 0
+    depth_1_raw = copy.deepcopy(depth_1)
+    depth_1[~valid_mask] = 0
+
+    pts1_raw, colors_raw = image_and_depth_to_point_cloud(img, depth_1_raw, fx=cam_k[0, 0], fy=cam_k[1, 1], cx=cam_k[0, 2], cy=cam_k[1, 2], max_depth=10000.0)
+    pts0, pts1, colors = image_and_depth_to_point_clouds(img, depth_0, depth_1, fx=cam_k[0, 0], fy=cam_k[1, 1], cx=cam_k[0, 2], cy=cam_k[1, 2], max_depth=5.0)
+
+    scale, R, t = calculate_scale_and_rt(pts1, pts0, iter_tims=5)
+    # pts1 = scale * (pts1 @ R.T) + t
+    pts1_raw = scale * (pts1_raw @ R.T) + t
+
+    align_depth = get_depth_by_xyz(img, pts1_raw, cam_k)
+    return align_depth
+
+
 def restore_mesh_2_raw_cam_pnp():
     # 得到crop归一化的图像的depth
     # root = "/home/pxn-lyj/Egolee/data/test/dexgrasp_show_realsense_20241009"
@@ -363,7 +440,7 @@ def restore_mesh_2_raw_cam_pnp():
     cam_k_path = os.path.join(root, "cam_k.txt")
     cam_k = np.loadtxt(cam_k_path)
     fx = cam_k[0, 0]
-    fy = cam_k[1, 1],
+    fy = cam_k[1, 1]
     cx = cam_k[0, 2]
     cy = cam_k[1, 2]
 

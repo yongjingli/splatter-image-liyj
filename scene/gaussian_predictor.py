@@ -483,6 +483,12 @@ class GaussianSplatPredictor(nn.Module):
         assert cfg.model.network_with_offset or cfg.model.network_without_offset, \
             "Need at least one network"
 
+        if hasattr(self.cfg.model, "no_pose"):
+            self.no_pose = self.cfg.model.no_pose
+        else:
+            self.no_pose = False
+        print("model no pose:", self.no_pose)
+
         if cfg.model.network_with_offset:
             split_dimensions, scale_inits, bias_inits = self.get_splits_and_inits(True, cfg)
             self.network_with_offset = networkCallBack(cfg, 
@@ -758,24 +764,20 @@ class GaussianSplatPredictor(nn.Module):
                          torch.ones((pos.shape[0], pos.shape[1], 1), device=pos.device, dtype=torch.float32)
                          ], dim=2)
 
-        # pos_cam = copy.deepcopy(pos)
+        # frame_idxs = torch.randperm(len(self.all_rgbs[example_id]))[:self.imgs_per_obj]
+        # 每次都是随机从相同对象的文件夹中选取idx, 然后再计算相对位姿, 那么每次都是与第一个计算相对位姿, 所以source_cameras_view_to_world[0]为单位矩阵
+        # 在训练的时候也是通过 [:cfg.data.input_images]的方式, 选择需要数据的图片作为输入
 
-        # 从输出的source_cameras_view_to_world来看, 每次进来的都是单位矩阵，所以source_cameras_view_to_world.t 等于source_cameras_view_to_world
-        # 所以在这里是右乘得到的结果与逆所得到的结果是一样的，掩盖了这里的错误
-        # print(torch.allclose(source_cameras_view_to_world[:, :3, :3], torch.eye(3).unsqueeze(0).cuda(), atol=1e-06))
+        # no_pose默认为false, 显式转到世界坐标
+        if not self.no_pose:
+            pos = torch.bmm(pos, source_cameras_view_to_world)
 
-        # 在训练的时候
-        #  frame_idxs = torch.randperm(len(self.all_rgbs[example_id]))[:self.imgs_per_obj]
-        # 每次都是随机从相同对象的文件夹中选取idx, 然后再计算相对位姿, 那么每次都是与第一个计算相对位姿, 都是单位矩阵
-        # 在训练的时候也是选择一个图片作为输入, 掩盖了在进行相对位姿计算时bmm的错误
+        # 这里是相机到世界坐标的的转换,应该是乘以source_cameras_view_to_world.T才对？？
+        # 对于答案，是输入进来的source_cameras_view_to_world的实际为source_cameras_view_to_world.T
+        pos = pos[:, :, :3] / (pos[:, :, 3:] + 1e-10)   # https://github.com/szymanowiczs/splatter-image/issues/28
 
-        pos = torch.bmm(pos, source_cameras_view_to_world)    # 这里是相机到世界坐标的的转换,应该是乘以source_cameras_view_to_world.T才对？？ 需要进一步确认
-        pos = pos[:, :, :3] / (pos[:, :, 3:] + 1e-10)
-
-        # pos_inv = torch.bmm(torch.cat([pos, torch.ones((pos.shape[0], pos.shape[1], 1), device=pos.device, dtype=torch.float32)], dim=2),
-        #                     torch.linalg.inv(source_cameras_view_to_world))
-
-        # pos_inv = torch.transpose(torch.linalg.inv(source_cameras_view_to_world)[0] @ torch.transpose(torch.cat([pos, torch.ones((pos.shape[0], pos.shape[1], 1), device=pos.device, dtype=torch.float32)], dim=2)[0], 1, 0), 1, 0)
+        # 修改为no-pose 输入的方案, 直接将全部转为在first-frame-space下进行预测 wandd id: likely-snowball-29
+        # pos = pos[:, :, :3]
 
         out_dict = {
             # "xyz_cam": pos_cam,
@@ -791,10 +793,11 @@ class GaussianSplatPredictor(nn.Module):
             out_dict["opacity"] = self.flatten_vector(opacity)
             out_dict["scaling"] = self.flatten_vector(scaling_out)
 
-        assert source_cv2wT_quat is not None
-        source_cv2wT_quat = source_cv2wT_quat.reshape(B*N_views, *source_cv2wT_quat.shape[2:])
-        out_dict["rotation"] = self.transform_rotations(out_dict["rotation"], 
-                    source_cv2wT_quat=source_cv2wT_quat)
+        if not self.no_pose:
+            assert source_cv2wT_quat is not None
+            source_cv2wT_quat = source_cv2wT_quat.reshape(B*N_views, *source_cv2wT_quat.shape[2:])
+            out_dict["rotation"] = self.transform_rotations(out_dict["rotation"],
+                        source_cv2wT_quat=source_cv2wT_quat)
 
         if self.cfg.model.max_sh_degree > 0:
             features_rest = self.flatten_vector(features_rest)
@@ -802,8 +805,10 @@ class GaussianSplatPredictor(nn.Module):
             # Split channel dimension B x N x C -> B x N x SH_num x 3  SH_num代表rgb中每个通道采用球谐函数的阶数(基函数的个数) 预测这些基函数的系数即可
             out_dict["features_rest"] = features_rest.reshape(*features_rest.shape[:2], -1, 3)
             assert self.cfg.model.max_sh_degree == 1 # "Only accepting degree 1"
-            out_dict["features_rest"] = self.transform_SHs(out_dict["features_rest"],
-                                                           source_cameras_view_to_world)
+
+            if not self.no_pose:
+                out_dict["features_rest"] = self.transform_SHs(out_dict["features_rest"],
+                                                               source_cameras_view_to_world)
         else:    
             out_dict["features_rest"] = torch.zeros((out_dict["features_dc"].shape[0], 
                                                      out_dict["features_dc"].shape[1], 

@@ -13,7 +13,13 @@ from .shared_dataset import SharedDataset
 
 # SHAPENET_DATASET_ROOT = None # Change this to your data directory
 SHAPENET_DATASET_ROOT = "/home/pxn-lyj/Egolee/data/shapenet_srn_data"
+
+# 设置为服务器的路径
+if not os.path.exists(SHAPENET_DATASET_ROOT):
+    SHAPENET_DATASET_ROOT = "/data/liyongjing/shapenet_srn_data"
+
 assert SHAPENET_DATASET_ROOT is not None, "Update the location of the SRN Shapenet Dataset"
+
 
 class SRNDataset(SharedDataset):
     def __init__(self, cfg,

@@ -17,8 +17,10 @@ data:
 opt:
   iterations: 800001
   base_lr: 0.00005
-#  batch_size: 8
-  batch_size: 2
+#  batch_size: 5  # 2个视图-pose
+  batch_size: 5  # 2个视图-no-pose
+#  batch_size: 8 # 1个视图在服务器
+#  batch_size: 2  # 1个视图在本地
   betas:
     - 0.9
     - 0.999
@@ -53,6 +55,7 @@ model:
   cross_view_attention: true
   base_dim: 128
   isotropic: false
+  no_pose: false    # false为采用帧间的位姿关系进行转换 true则直接预测first-frame空间下的属性
 
 logging:
   ckpt_iterations: 1000

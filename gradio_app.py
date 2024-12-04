@@ -34,8 +34,6 @@ def main():
     device = torch.device("cuda:0")
     torch.cuda.set_device(device)
 
-
-
     # set local_dir？
     # model_path = hf_hub_download(repo_id="szymanowiczs/splatter-image-multi-category-v1",
     #                             filename="model_latest.pth")
@@ -45,6 +43,11 @@ def main():
 
     # model_cfg = "/home/pxn-lyj/Egolee/programs/splatter-image-liyj/checkpoints/shapenet/config_cars.yaml"
     # model_path = "/home/pxn-lyj/Egolee/programs/splatter-image-liyj/checkpoints/shapenet/model_cars.pth"
+
+    # 本地训练的shapenet-car模型
+    # model_cfg = "/home/pxn-lyj/Egolee/programs/splatter-image-liyj/checkpoints/shapenet_cat_self/cfg_saved.yaml"
+    # # model_path = "/home/pxn-lyj/Egolee/programs/splatter-image-liyj/checkpoints/shapenet_cat_self/model_best.pth"
+    # model_path = "/home/pxn-lyj/Egolee/programs/splatter-image-liyj/checkpoints/shapenet_cat_self/model_latest.pth"
 
     model_cfg = OmegaConf.load(model_cfg)
 
@@ -93,6 +96,7 @@ def main():
             None,
             activate_output=False)
 
+
         reconstruction = {k: v[0].contiguous() for k, v in reconstruction_unactivated.items()}
         reconstruction["scaling"] = model.scaling_activation(reconstruction["scaling"])
         reconstruction["opacity"] = model.opacity_activation(reconstruction["opacity"])
@@ -102,6 +106,7 @@ def main():
         background = torch.tensor([1, 1, 1] , dtype=torch.float32, device=device)
         loop_renders = []
         t_to_512 = torchvision.transforms.Resize(512, interpolation=torchvision.transforms.InterpolationMode.NEAREST)
+
         for r_idx in range( world_view_transforms.shape[0]):
             image = render_predicted(reconstruction,
                                         world_view_transforms[r_idx].to(device),

@@ -1,4 +1,7 @@
 import argparse
+import os.path
+import shutil
+
 import cv2
 import matplotlib.pyplot as plt
 import numpy as np
@@ -270,21 +273,86 @@ class Detic():
         return preds
 
 
+from infer_complete_objs_in_scence_online import get_crop_and_expand_rect_by_mask, pad_and_resize_img, resize_to_128_with_K
+def save_splatter_input_img(s_root, color_image, preds):
+    obj_boxes = preds["pred_boxes"]
+    obj_masks = preds["pred_masks"]
+
+    # everything_results = fast_sam_model(color_image[:, :, ::-1], device="cuda:0", retina_masks=True, imgsz=1024, conf=0.6, iou=0.01,)
+    # prompt_process = FastSAMPrompt(color_image[:, :, ::-1], everything_results, device="cuda:0")
+    # s_color_path = os.path.join(s_root, str(count) + "_color.jpg")
+    # s_depth_path = os.path.join(s_root, str(count) + "_depth.npy")
+    #
+    # cv2.imwrite(s_color_path, color_image)
+    # np.save(s_depth_path, depth)
+
+    if len(obj_boxes) > 0:
+        # print("obj_boxes:", len(obj_boxes))
+        # anns = prompt_process.box_prompt(bboxes=obj_boxes)
+        # print("anns:", len(anns))
+        # prompt_process.plot(annotations=anns, output_path='./tmp/dog.jpg', )
+
+        complete_ojbs = []
+        complete_ojbs_color = []
+        complete_ojbs_sematic = []
+        for obj_id, object_mask in enumerate(obj_masks):
+            object_mask = object_mask > 0
+            if np.sum(object_mask) < 20:
+                continue
+
+            obj_mask = object_mask
+
+            radius = 10
+            kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (radius * 2 + 1, radius * 2 + 1))
+            obj_mask = cv2.morphologyEx(obj_mask.astype(np.uint8), cv2.MORPH_CLOSE, kernel)
+            obj_mask = obj_mask > 0
+
+            crop_x, crop_y, crop_w, crop_h = get_crop_and_expand_rect_by_mask(obj_mask)
+            if crop_x == None:
+                continue
+
+            # mask有可能是分开的，选择最大的mask部分
+            max_part_mask = np.zeros_like(obj_mask)
+            max_part_mask[crop_y:crop_y + crop_h, crop_x:crop_x + crop_w] = 1
+            obj_mask = np.bitwise_and(obj_mask, max_part_mask)
+
+            img_crop = color_image[crop_y:crop_y + crop_h, crop_x:crop_x + crop_w, :].copy()
+
+            mask_crop = obj_mask[crop_y:crop_y + crop_h, crop_x:crop_x + crop_w]
+            img_crop[~mask_crop] = (255, 255, 255)
+
+            img_crop_pad, crop_pad_h, crop_pad_w = pad_and_resize_img(img_crop, foreground_ratio=0.65)
+            img_crop_pad, crop_cam_k, crop_pad_scale = resize_to_128_with_K(img_crop_pad, fov=49.0)
+
+            s_path = os.path.join(s_root, str(obj_id) + ".jpg")
+            cv2.imwrite(s_path, img_crop_pad)
+
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("--imgpath", type=str, default='desk.jpg', help="image path")
-    parser.add_argument("--confThreshold", default=0.5, type=float, help='class confidence')
+    parser.add_argument("--confThreshold", default=0.3, type=float, help='class confidence')
     parser.add_argument("--modelpath", type=str, default='weights/Detic_C2_R50_640_4x_in21k.onnx', help="onnxmodel path")
     args = parser.parse_args()
 
     args.modelpath = "/home/pxn-lyj/Egolee/programs/splatter-image-liyj/local_files/Detic_C2_R50_640_4x_in21k.onnx"
-    args.imgpath = "/home/pxn-lyj/Egolee/data/test/dexgrasp_show_realsense_20241009/colors/20_color.jpg"
+    # args.imgpath = "/home/pxn-lyj/Egolee/data/test/dexgrasp_show_realsense_20241009/colors/20_color.jpg"
+    args.imgpath = "/home/pxn-lyj/Egolee/data/test/透明物体/0_raw_color_shot4.png"
 
     mynet = Detic(args.modelpath, confThreshold=args.confThreshold)
     srcimg = cv2.imread(args.imgpath)
     preds = mynet.detect(srcimg)
-    srcimg = mynet.draw_predictions(srcimg, preds)
 
+    s_root = "/home/pxn-lyj/Egolee/programs/splatter-image-liyj/local_files/tmp"
+    if os.path.exists(s_root):
+        shutil.rmtree(s_root)
+    os.mkdir(s_root)
+
+
+    save_splatter_input_img(s_root, srcimg, preds)
+
+    srcimg = mynet.draw_predictions(srcimg, preds)
     plt.imshow(srcimg[:, :, ::-1])
     plt.show()
 

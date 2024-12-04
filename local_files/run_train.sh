@@ -9,6 +9,10 @@
 
 cd ../
 
+# 训练的时候注意修改 configs/default_config.yaml 中的 batch_size: 5 no_pose: false
+
+# 恢复训练注意修改: configs/hydra/defaults.yaml 中的dir
+
 # 数据位置的定义在相应的数据类里定义, 如datasets/srn.py 里 SHAPENET_DATASET_ROOT = "/home/pxn-lyj/Egolee/data/shapenet_srn_data"
 #export CUDA_VISIBLE_DEVICES=0,1
 #export CUDA_VISIBLE_DEVICES=1,2
